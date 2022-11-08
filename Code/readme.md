@@ -1,0 +1,2 @@
+This README file should explain what order codes need to be run in 
+(e.g., codes to fetch data should be run first, then code to preprocess, and then modeling, etc.) and a short description of what each script does.
