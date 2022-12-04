@@ -22,7 +22,7 @@ OUTPUT_DIM = 3
 BATCH_SIZE = 64
 #MAX_VOCAB_SIZE = 25_000
 MAX_LEN = 300
-N_EPOCHS = 10
+N_EPOCHS = 5
 LR = 0.001
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
@@ -255,23 +255,44 @@ for epoch in range(N_EPOCHS):
     print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
 
 # Test Set:
-test_losses = []
-test_acc = []
-model.eval()
-test_h = model.init_hidden(BATCH_SIZE)
-for batch in valid_loader:
-    inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-    test_h = tuple([each.data for each in test_h])
-    output, test_h = model(inputs, test_h, attention_mask)
-    test_loss = criterion(output, labels.float())
-    test_losses.append(test_loss.item())
-    # Update tracking variables
-    preds = output.detach().cpu().numpy()
-    new_preds = np.zeros(preds.shape)
-    for i in range(len(preds)):
-        new_preds[i][np.argmax(preds[i])] = 1
-    test_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                              y_pred=new_preds.astype(int))
-    test_acc.append(test_accuracy)
-test_acc_av = test_acc/len(test_loader.dataset)
-print(test_acc_av)
+# test_losses = []
+# test_acc = []
+# model.eval()
+# test_h = model.init_hidden(BATCH_SIZE)
+# for batch in valid_loader:
+#     inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
+#     test_h = tuple([each.data for each in test_h])
+#     output, test_h = model(inputs, test_h, attention_mask)
+#     test_loss = criterion(output, labels.float())
+#     test_losses.append(test_loss.item())
+#     # Update tracking variables
+#     preds = output.detach().cpu().numpy()
+#     new_preds = np.zeros(preds.shape)
+#     for i in range(len(preds)):
+#         new_preds[i][np.argmax(preds[i])] = 1
+#     test_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+#                               y_pred=new_preds.astype(int))
+#     test_acc.append(test_accuracy)
+# test_acc_av = test_acc/len(test_loader.dataset)
+# print(test_acc_av)
+
+
+# %% -------------------------------------- Interpretation ------------------------------------------------------------------
+import IPython
+import shap
+from IPython.core.display import HTML
+
+batch = next(iter(train_loader))
+inputs, labels, attention_mask = batch['input_ids'], batch['labels'], batch['attention_mask']
+batch_hidden = model.init_hidden(BATCH_SIZE)
+batch_hidden = tuple([each.data for each in batch_hidden])
+
+
+#
+explainer = shap.Explainer(model, [inputs, batch_hidden, attention_mask] )
+#
+shap_values = explainer([inputs, batch_hidden, attention_mask])
+
+shap.plots.text(shap_values[2])
+
+IPython.core.display.HTML(data=shap.plots.text(shap_values))
