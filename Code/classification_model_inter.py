@@ -106,7 +106,7 @@ class nlpDataset(Dataset):
 
 
 
-# %% -------------------------------------- Model Class ------------------------------------------------------------------
+# %% -------------------------------------- Model Classes ------------------------------------------------------------------
 class BERT_PLUS_RNN(nn.Module):
 
     def __init__(self, bert, no_layers, hidden_dim, output_dim, batch_size):
@@ -144,6 +144,23 @@ class BERT_PLUS_RNN(nn.Module):
         hidden = (h0, c0)
         return hidden
 
+class BERT_PLUS_MLP(nn.Module):
+
+    def __init__(self, bert, num_class, hidden_dim):
+        super(BERT_PLUS_MLP, self).__init__()
+        self.bert = bert
+        self.fc1 = nn.Linear(bert.pooler.dense.out_features, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, num_class)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
+
+    def forward(self, input_ids, attention_mask):
+        _, cls_hs = self.bert(input_ids=input_ids, attention_mask=attention_mask, return_dict=False)
+        x = self.fc1(cls_hs)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv
