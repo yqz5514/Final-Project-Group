@@ -395,3 +395,68 @@ else:
 
 print('Done')
 # %% -------------------------------------- Interpretation for MLP ------------------------------------------------------------------
+# Based on tutorial from: https://medium.com/aiguys/bert-explainability-5b54cff01407, based off https://captum.ai/tutorials/Bert_SQUAD_Interpret
+
+# import numpy as np
+# import pandas as pd
+# import seaborn as sns
+# import matplotlib.pyplot as plt
+#
+# import torch
+# import torch.nn as nn
+#
+# from transformers import BertTokenizer, BertForQuestionAnswering, BertConfig
+#
+# from captum.attr import visualization as viz
+# from captum.attr import LayerConductance, LayerIntegratedGradients, TokenReferenceBase
+#
+# ref_token_id = tokenizer.pad_token_id # A token used for generating token reference
+# sep_token_id = tokenizer.sep_token_id # A token used as a separator between question and text and it is also added to the end of the text.
+# cls_token_id = tokenizer.cls_token_id # A token used for prepending to the concatenated question-text word sequence
+#
+# # Helper functions below
+# def predict(input_ids, attention_mask=None):
+#     output = model(input_ids=input_ids, attention_mask=attention_mask)
+#     return output
+#
+# def forward_func(input_ids, attention_mask=None):
+#     pred = predict(input_ids=input_ids,
+#                    attention_mask=attention_mask)
+#     return pred
+#
+# ref_token_id = tokenizer.pad_token_id # A token used for generating token reference
+#
+# token_reference = TokenReferenceBase(reference_token_idx=ref_token_id)
+# def construct_input_ref_pair(text, ref_token_id):
+#     # construct input token ids
+#     input_ids = tokenizer.encode(text, add_special_tokens=False)
+#
+#     # construct reference token ids
+#     ref_input_ids = [ref_token_id] * len(input_ids)
+#
+#     return torch.tensor([input_ids], device=device), torch.tensor([ref_input_ids], device=device)
+#
+#
+# def construct_whole_bert_embeddings(input_ids, ref_input_ids):
+#     input_embeddings = model.bert.embeddings(input_ids)
+#     ref_input_embeddings = model.bert.embeddings(ref_input_ids)
+#
+#     return input_embeddings, ref_input_embeddings
+#
+# lig = LayerIntegratedGradients(forward_func, model.bert.embeddings)
+# lig = LayerIntegratedGradients(model, model.bert.embeddings)
+#
+# attributions = lig.attribute(inputs=input_ids,
+#                                   baselines=ref_input_ids,
+#                                   additional_forward_args=attention_mask,
+#                                   return_convergence_delta=True)
+#
+# def summarize_attributions(attributions):
+#     attributions = attributions.sum(dim=-1).squeeze(0)
+#     attributions = attributions / torch.norm(attributions)
+#     return attributions
+#
+# for batch in test_loader:
+#     break
+# inputs, attention_mask, labels = batch['input_ids'], batch['attention_mask'], batch['labels']
+
