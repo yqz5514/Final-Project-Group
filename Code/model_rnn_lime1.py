@@ -14,6 +14,28 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import string
 from nltk.corpus import stopwords
+#%%
+#%%
+os.chdir('/home/ubuntu/test/Final-Project-Group/Code')
+os.getcwd()
+#%%
+df = pd.read_csv('Tweets.csv')
+#%%
+df.head()
+#%%
+df1 = df[['text','airline_sentiment']].copy()
+df1['WORD_COUNT'] = df1['text'].apply(lambda x: len(x.split()))
+#%%
+df1.describe()
+#  WORD_COUNT
+# count  14640.000000
+# mean      17.653415
+# std        6.882259
+# min        2.000000
+# 25%       12.000000
+# 50%       19.000000
+# 75%       23.000000
+# max       36.000000
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -24,8 +46,8 @@ OUTPUT_DIM = 3
 BATCH_SIZE = 64
 #MAX_VOCAB_SIZE = 25_000
 MAX_LEN = 300
-N_EPOCHS = 6
-LR = 0.001
+N_EPOCHS = 5
+LR = 0.0001
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 
@@ -128,12 +150,7 @@ def getLabel(df, label_col, input_col):
     return_df = encoded[[input_col, 'target']]
     return return_df
 
-def getLabel(df, label_col, input_col):
-    encoded = pd.get_dummies(df, columns=[label_col])
-    encoded_val = encoded.iloc[:, 1:].apply(list, axis=1)
-    encoded['target'] = encoded_val
-    return_df = encoded[[input_col, 'target']]
-    return return_df
+
 
 def create_data_loader(df, tokenizer, max_len=MAX_LEN,batch_size=BATCH_SIZE):
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -190,6 +207,7 @@ class BERT_PLUS_RNN(nn.Module):
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.batch_size = batch_size
+        #self.batch_size = 1
         self.embedding_dim = bert.config.to_dict()['hidden_size']
         self.no_layers = no_layers
         self.lstm = nn.LSTM(input_size=self.embedding_dim, hidden_size=self.hidden_dim, num_layers=no_layers,
@@ -272,120 +290,43 @@ optimizer = AdamW(model.parameters(), lr=LR)
 criterion = torch.nn.BCELoss()
 
 # Store our loss and accuracy for plotting
-
-valid_loss_min = np.Inf
-epoch_tr_loss, epoch_vl_loss = [], []
-epoch_tr_acc, epoch_vl_acc = [], []
-
-
-
-for epoch in range(N_EPOCHS):
-    # Tracking variables
-    train_losses = []
-    train_acc = []
-    model.train()
-    h = model.init_hidden(BATCH_SIZE)
-    for batch in train_loader:
-        inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-        h = tuple([each.data for each in h])
-        model.zero_grad()
-        output, h = model(inputs, h, attention_mask)
-        loss = criterion(output, labels.float())
-        loss.backward()
-        train_losses.append(loss.item())
-        # Update tracking variables
-        preds = output.detach().cpu().numpy()
-        new_preds = np.zeros(preds.shape)
-        for i in range(len(preds)):
-            new_preds[i][np.argmax(preds[i])] = 1
-        accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                  y_pred=new_preds.astype(int))
-        train_acc.append(accuracy)
-        nn.utils.clip_grad_norm_(model.parameters(), clip)
-        optimizer.step()
-
-    val_losses = []
-    val_acc = []
-    model.eval()
-    val_h = model.init_hidden(BATCH_SIZE)
-    for batch in valid_loader:
-        inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-        val_h = tuple([each.data for each in val_h])
-        output, val_h = model(inputs, val_h, attention_mask)
-        val_loss = criterion(output, labels.float())
-        val_losses.append(val_loss.item())
-        # Update tracking variables
-        preds = output.detach().cpu().numpy()
-        new_preds = np.zeros(preds.shape)
-        for i in range(len(preds)):
-            new_preds[i][np.argmax(preds[i])] = 1
-        val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                  y_pred=new_preds.astype(int))
-        val_acc.append(val_accuracy)
-
-    epoch_train_loss = np.mean(train_losses)
-    epoch_val_loss = np.mean(val_losses)
-    # epoch_train_acc = train_acc / len(train_loader.dataset)
-    # epoch_val_acc = val_acc / len(valid_loader.dataset)
-    epoch_train_acc = np.mean(train_acc)
-    epoch_val_acc = np.mean(val_acc)
-    epoch_tr_loss.append(epoch_train_loss)
-    epoch_vl_loss.append(epoch_val_loss)
-    epoch_tr_acc.append(epoch_train_acc)
-    epoch_vl_acc.append(epoch_val_acc)
-    print(f'Epoch {epoch + 1}')
-    print(f'train_loss : {epoch_train_loss} val_loss : {epoch_val_loss}')
-    print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
-#%%-----------------------------------Lime_Inter-------------------------------------------------
-import lime
-from lime import lime_text
+#%%-----------------------------------------------Lime_1----------------------------------------------------------
 from lime.lime_text import LimeTextExplainer
-from sklearn.pipeline import make_pipeline
-import torch.nn.functional as F
-# batch = next(iter(train_loader))
-# inputs, labels, attention_mask = batch['input_ids'], batch['labels'], batch['attention_mask']
-# batch_hidden = model.init_hidden(BATCH_SIZE)
-# batch_hidden = tuple([each.data for each in batch_hidden])
 
-#%%
-class_names=['neutral', 'positive', 'negative']
+explainer = LimeTextExplainer(class_names=['neutral', 'positive', 'negative'])
 
-def predict(input_ids, attention_mask=None):
-     output = model(input_ids=input_ids, attention_mask=attention_mask)
-     probas = F.softmax(output.logits).detach().numpy()
-     return probas
-    # probas = F.softmax(outputs.logits).detach().numpy()
-    # return probas
 
-explainer = LimeTextExplainer(class_names=class_names)
-# def predictor(texts):
-#     outputs = model(**tokenizer(texts, return_tensors="pt", padding=True))
-#     probas = F.softmax(outputs.logits).detach().numpy()
-#     return probas
-str_to_predict = "americanair thx losing bag hard care bag w priority itwhy cont care eps"
-exp = explainer.explain_instance(str_to_predict, predict(), num_features=20, num_samples=2000)
-exp.show_in_notebook(text=str_to_predict)
+def predict_probab(STR):
+    z = tokenizer.encode_plus(
+        STR,
+        add_special_tokens=True,
+        max_length=200,
+        return_attention_mask=True,
+        is_split_into_words=True,
+        truncation=True,
+        padding='max_length',
+        return_tensors='pt', )
+    # z = tokenizer.encode_plus(STR, add_special_tokens=True, max_length=512, truncation=True, padding='max_length',
+    #                           return_token_type_ids=True, return_attention_mask=True, return_tensors='np')
+    #inputs = [z['input_ids'], z['attention_mask']]
+    inputs, attention_mask = z['input_ids'].to(device),z['attention_mask'].to(device)
+    h = model.init_hidden(BATCH_SIZE)
+    h = tuple([each.data for each in h])
+    output, h = model(inputs, h, attention_mask)
+    preds = output.detach().cpu().numpy()
 
-#%%
-# #Test Set:
-# # Test Set:
-# test_losses = []
-# test_acc = []
-# model.eval()
-# test_h = model.init_hidden(BATCH_SIZE)
-# for batch in valid_loader:
-#     inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-#     test_h = tuple([each.data for each in test_h])
-#     output, test_h = model(inputs, test_h, attention_mask)
-#     test_loss = criterion(output, labels.float())
-#     test_losses.append(test_loss.item())
-#     # Update tracking variables
-#     preds = output.detach().cpu().numpy()
-#     new_preds = np.zeros(preds.shape)
-#     for i in range(len(preds)):
-#         new_preds[i][np.argmax(preds[i])] = 1
-#     test_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-#                               y_pred=new_preds.astype(int))
-#     test_acc.append(test_accuracy)
-#     #test_acc_av = test_accuracy/len(test_loader.dataset)
-# print(test_acc)
+    # for batch in test_loader:
+    #     outputs = model(input_ids=batch[input_ids].to(device), attention_mask=batch['attention_mask'].to(device))
+    #     preds = outputs.detach().cpu().numpy()
+    #     return preds
+    # inputs = [z['input_ids'], z['attention_mask']]
+    # k = []
+    # k.append(float(model.predict(inputs).reshape(-1, 1)))
+    # k.append(float(1 - model.predict(inputs).reshape(-1, 1)))
+    # k = np.array(k).reshape(1, -1)
+
+    return preds
+
+#input_ids = '13789'
+STR = str(test.text[13789])
+exp = explainer.explain_instance(STR, predict_probab, num_features=10, num_samples=1)
