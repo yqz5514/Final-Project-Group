@@ -12,6 +12,7 @@ from transformers import AdamW
 from transformers import get_scheduler
 from sklearn.metrics import accuracy_score
 import numpy as np
+import gdown
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -24,9 +25,14 @@ BATCH_SIZE = 64
 MAX_LEN = 300
 N_EPOCHS = 5
 LR = 0.001
+no_layers = 3
+hidden_dim = 256
+clip = 5
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-
+model_type = 'MLP'
+#Says we want to save the best model during training loop
+SAVE_MODEL = True
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
 def TextCleaning(text):
     '''
@@ -104,6 +110,176 @@ class nlpDataset(Dataset):
 
         return output
 
+def Trainer(model_type=model_type):
+    if model_type == 'RNN':
+        model = BERT_PLUS_RNN(bert, no_layers, hidden_dim, OUTPUT_DIM, BATCH_SIZE)
+        model.to(device)
+
+        optimizer = AdamW(model.parameters(), lr=LR)
+        criterion = torch.nn.BCELoss()
+
+        # Store our loss and accuracy for plotting
+
+        valid_loss_min = np.Inf
+        epoch_tr_loss, epoch_vl_loss = [], []
+        epoch_tr_acc, epoch_vl_acc = [], []
+        met_test_best = 0
+
+        for epoch in range(N_EPOCHS):
+            # Tracking variables
+            train_losses = []
+            train_acc = []
+            model.train()
+            h = model.init_hidden(BATCH_SIZE)
+            for batch in train_loader:
+                inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch[
+                    'attention_mask'].to(device)
+                h = tuple([each.data for each in h])
+                model.zero_grad()
+                output, h = model(inputs, h, attention_mask)
+                loss = criterion(output, labels.float())
+                loss.backward()
+                train_losses.append(loss.item())
+                # Update tracking variables
+                preds = output.detach().cpu().numpy()
+                new_preds = np.zeros(preds.shape)
+                for i in range(len(preds)):
+                    new_preds[i][np.argmax(preds[i])] = 1
+                accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+                                          y_pred=new_preds.astype(int))
+                train_acc.append(accuracy)
+                nn.utils.clip_grad_norm_(model.parameters(), clip)
+                optimizer.step()
+
+            val_losses = []
+            val_acc = []
+            model.eval()
+            val_h = model.init_hidden(BATCH_SIZE)
+            for batch in valid_loader:
+                inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch[
+                    'attention_mask'].to(device)
+                val_h = tuple([each.data for each in val_h])
+                output, val_h = model(inputs, val_h, attention_mask)
+                val_loss = criterion(output, labels.float())
+                val_losses.append(val_loss.item())
+                # Update tracking variables
+                preds = output.detach().cpu().numpy()
+                new_preds = np.zeros(preds.shape)
+                for i in range(len(preds)):
+                    new_preds[i][np.argmax(preds[i])] = 1
+                val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+                                              y_pred=new_preds.astype(int))
+                val_acc.append(val_accuracy)
+
+            epoch_train_loss = np.mean(train_losses)
+            epoch_val_loss = np.mean(val_losses)
+            # epoch_train_acc = train_acc / len(train_loader.dataset)
+            # epoch_val_acc = val_acc / len(valid_loader.dataset)
+            epoch_train_acc = np.mean(train_acc)
+            epoch_val_acc = np.mean(val_acc)
+            epoch_tr_loss.append(epoch_train_loss)
+            epoch_vl_loss.append(epoch_val_loss)
+            epoch_tr_acc.append(epoch_train_acc)
+            epoch_vl_acc.append(epoch_val_acc)
+            print(f'Epoch {epoch + 1}')
+            print(f'train_loss : {epoch_train_loss} val_loss : {epoch_val_loss}')
+            print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
+
+            # Sets the prioritized metric to be the validation accuracy
+            met_test = epoch_val_acc
+
+            # Saves the best model (assuming SAVE_MODEL=True at start): Code based on Exam 2 model saving code
+            if met_test > met_test_best and SAVE_MODEL:
+                torch.save(model.state_dict(), "model_nn.pt")
+                print("The model has been saved!")
+                met_test_best = met_test
+
+    else:
+        model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
+        optimizer = AdamW(model.parameters(), lr=LR)
+
+        num_training_steps = N_EPOCHS * len(train_loader)
+        lr_scheduler = get_scheduler("linear", optimizer=optimizer,
+                                     num_warmup_steps=0, num_training_steps=num_training_steps)
+        print(num_training_steps)
+
+        model.to(device)
+
+        # Store our loss and accuracy for plotting
+        train_loss_set = []
+
+        epoch_tr_loss, epoch_vl_loss = [], []
+        epoch_tr_acc, epoch_vl_acc = [], []
+        met_test_best = 0
+
+        for epoch in range(N_EPOCHS):
+            # Tracking variables
+            train_losses = []
+            train_acc = []
+            model.train()
+            for batch in train_loader:
+                # clear previously calculated gradients
+                model.zero_grad()
+                outputs = model(input_ids=batch['input_ids'].to(device),
+                                attention_mask=batch['attention_mask'].to(device))
+                criterion = torch.nn.BCELoss()
+                loss = criterion(outputs.view(-1, OUTPUT_DIM), batch['labels'].type_as(outputs).view(-1, OUTPUT_DIM))
+                loss.backward()
+                train_losses.append(loss.item())
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+                # Update tracking variables
+                preds = outputs.detach().cpu().numpy()
+                new_preds = np.zeros(preds.shape)
+                for i in range(len(preds)):
+                    new_preds[i][np.argmax(preds[i])] = 1
+                accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+                                          y_pred=new_preds.astype(int))
+                train_acc.append(accuracy)
+
+            val_losses = []
+            val_acc = []
+            model.eval()
+            for batch in valid_loader:
+                with torch.no_grad():
+                    outputs = model(input_ids=batch['input_ids'].to(device),
+                                    attention_mask=batch['attention_mask'].to(device))
+                    criterion = torch.nn.BCELoss()
+                    loss = criterion(outputs.view(-1, OUTPUT_DIM),
+                                     batch['labels'].type_as(outputs).view(-1, OUTPUT_DIM))
+                    val_losses.append(loss.item())
+                    # Update tracking variables
+                    preds = outputs.detach().cpu().numpy()
+                    new_preds = np.zeros(preds.shape)
+                    for i in range(len(preds)):
+                        new_preds[i][np.argmax(preds[i])] = 1
+                    val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+                                                  y_pred=new_preds.astype(int))
+                    val_acc.append(val_accuracy)
+
+            epoch_train_loss = np.mean(train_losses)
+            epoch_val_loss = np.mean(val_losses)
+            # epoch_train_acc = train_acc / len(train_loader.dataset)
+            # epoch_val_acc = val_acc / len(valid_loader.dataset)
+            epoch_train_acc = np.mean(train_acc)
+            epoch_val_acc = np.mean(val_acc)
+            epoch_tr_loss.append(epoch_train_loss)
+            epoch_vl_loss.append(epoch_val_loss)
+            epoch_tr_acc.append(epoch_train_acc)
+            epoch_vl_acc.append(epoch_val_acc)
+            print(f'Epoch {epoch + 1}')
+            print(f'train_loss : {epoch_train_loss} val_loss : {epoch_val_loss}')
+            print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
+
+            # Sets the prioritized metric to be the validation accuracy
+            met_test = epoch_val_acc
+
+            # Saves the best model (assuming SAVE_MODEL=True at start): Code based on Exam 2 model saving code
+            if met_test > met_test_best and SAVE_MODEL:
+                torch.save(model.state_dict(), "model_nn.pt")
+                print("The model has been saved!")
+                met_test_best = met_test
 
 
 # %% -------------------------------------- Model Classes ------------------------------------------------------------------
@@ -165,10 +341,12 @@ class BERT_PLUS_MLP(nn.Module):
         return x
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
-# step 1: load data from .csv
-PATH = os.getcwd()
-os.chdir(PATH + '/archive(4)/')
-
+# step 1: load data from .csv from google drive
+url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
+gdown.download(url, 'Tweets.csv', quiet=False)
+# PATH = os.getcwd()
+# os.chdir(PATH + '/archive(4)/')
+#
 df = pd.read_csv('Tweets.csv')
 
 # get data with only text and labels
@@ -198,199 +376,8 @@ bert = AutoModel.from_pretrained(checkpoint)
 #freeze the pretrained layers
 for param in bert.parameters():
     param.requires_grad = False
-no_layers = 3
-hidden_dim = 256
-clip = 5
-model_type = 'MLP'
 
-if model_type == 'RNN':
-    model = BERT_PLUS_RNN(bert, no_layers, hidden_dim, OUTPUT_DIM, BATCH_SIZE)
-    model.to(device)
-
-    optimizer = AdamW(model.parameters(), lr=LR)
-    criterion = torch.nn.BCELoss()
-
-    # Store our loss and accuracy for plotting
-
-    valid_loss_min = np.Inf
-    epoch_tr_loss, epoch_vl_loss = [], []
-    epoch_tr_acc, epoch_vl_acc = [], []
-
-    for epoch in range(N_EPOCHS):
-        # Tracking variables
-        train_losses = []
-        train_acc = []
-        model.train()
-        h = model.init_hidden(BATCH_SIZE)
-        for batch in train_loader:
-            inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-            h = tuple([each.data for each in h])
-            model.zero_grad()
-            output, h = model(inputs, h, attention_mask)
-            loss = criterion(output, labels.float())
-            loss.backward()
-            train_losses.append(loss.item())
-            # Update tracking variables
-            preds = output.detach().cpu().numpy()
-            new_preds = np.zeros(preds.shape)
-            for i in range(len(preds)):
-                new_preds[i][np.argmax(preds[i])] = 1
-            accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                      y_pred=new_preds.astype(int))
-            train_acc.append(accuracy)
-            nn.utils.clip_grad_norm_(model.parameters(), clip)
-            optimizer.step()
-
-        val_losses = []
-        val_acc = []
-        model.eval()
-        val_h = model.init_hidden(BATCH_SIZE)
-        for batch in valid_loader:
-            inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-            val_h = tuple([each.data for each in val_h])
-            output, val_h = model(inputs, val_h, attention_mask)
-            val_loss = criterion(output, labels.float())
-            val_losses.append(val_loss.item())
-            # Update tracking variables
-            preds = output.detach().cpu().numpy()
-            new_preds = np.zeros(preds.shape)
-            for i in range(len(preds)):
-                new_preds[i][np.argmax(preds[i])] = 1
-            val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                      y_pred=new_preds.astype(int))
-            val_acc.append(val_accuracy)
-
-        epoch_train_loss = np.mean(train_losses)
-        epoch_val_loss = np.mean(val_losses)
-        # epoch_train_acc = train_acc / len(train_loader.dataset)
-        # epoch_val_acc = val_acc / len(valid_loader.dataset)
-        epoch_train_acc = np.mean(train_acc)
-        epoch_val_acc = np.mean(val_acc)
-        epoch_tr_loss.append(epoch_train_loss)
-        epoch_vl_loss.append(epoch_val_loss)
-        epoch_tr_acc.append(epoch_train_acc)
-        epoch_vl_acc.append(epoch_val_acc)
-        print(f'Epoch {epoch + 1}')
-        print(f'train_loss : {epoch_train_loss} val_loss : {epoch_val_loss}')
-        print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
-
-# Test Set:
-# test_losses = []
-# test_acc = []
-# model.eval()
-# test_h = model.init_hidden(BATCH_SIZE)
-# for batch in valid_loader:
-#     inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch['attention_mask'].to(device)
-#     test_h = tuple([each.data for each in test_h])
-#     output, test_h = model(inputs, test_h, attention_mask)
-#     test_loss = criterion(output, labels.float())
-#     test_losses.append(test_loss.item())
-#     # Update tracking variables
-#     preds = output.detach().cpu().numpy()
-#     new_preds = np.zeros(preds.shape)
-#     for i in range(len(preds)):
-#         new_preds[i][np.argmax(preds[i])] = 1
-#     test_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-#                               y_pred=new_preds.astype(int))
-#     test_acc.append(test_accuracy)
-# test_acc_av = test_acc/len(test_loader.dataset)
-# print(test_acc_av)
-
-else:
-    model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
-    optimizer = AdamW(model.parameters(), lr=LR)
-
-    num_training_steps = N_EPOCHS * len(train_loader)
-    lr_scheduler = get_scheduler("linear", optimizer=optimizer,
-                                 num_warmup_steps=0, num_training_steps=num_training_steps)
-    print(num_training_steps)
-
-    model.to(device)
-
-    # Store our loss and accuracy for plotting
-    train_loss_set = []
-
-    valid_loss_min = np.Inf
-    epoch_tr_loss, epoch_vl_loss = [], []
-    epoch_tr_acc, epoch_vl_acc = [], []
-
-    for epoch in range(N_EPOCHS):
-        # Tracking variables
-        train_losses = []
-        train_acc = []
-        model.train()
-        for batch in train_loader:
-            # clear previously calculated gradients
-            model.zero_grad()
-            outputs = model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device))
-            criterion = torch.nn.BCELoss()
-            loss = criterion(outputs.view(-1, OUTPUT_DIM), batch['labels'].type_as(outputs).view(-1, OUTPUT_DIM))
-            loss.backward()
-            train_losses.append(loss.item())
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
-            # Update tracking variables
-            preds = outputs.detach().cpu().numpy()
-            new_preds = np.zeros(preds.shape)
-            for i in range(len(preds)):
-                new_preds[i][np.argmax(preds[i])] = 1
-            accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                      y_pred=new_preds.astype(int))
-            train_acc.append(accuracy)
-
-        val_losses = []
-        val_acc = []
-        model.eval()
-        for batch in valid_loader:
-            with torch.no_grad():
-                outputs = model(input_ids=batch['input_ids'].to(device),
-                                attention_mask=batch['attention_mask'].to(device))
-                criterion = torch.nn.BCELoss()
-                loss = criterion(outputs.view(-1, OUTPUT_DIM), batch['labels'].type_as(outputs).view(-1, OUTPUT_DIM))
-                val_losses.append(loss.item())
-                # Update tracking variables
-                preds = outputs.detach().cpu().numpy()
-                new_preds = np.zeros(preds.shape)
-                for i in range(len(preds)):
-                    new_preds[i][np.argmax(preds[i])] = 1
-                val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                          y_pred=new_preds.astype(int))
-                val_acc.append(val_accuracy)
-
-        epoch_train_loss = np.mean(train_losses)
-        epoch_val_loss = np.mean(val_losses)
-        # epoch_train_acc = train_acc / len(train_loader.dataset)
-        # epoch_val_acc = val_acc / len(valid_loader.dataset)
-        epoch_train_acc = np.mean(train_acc)
-        epoch_val_acc = np.mean(val_acc)
-        epoch_tr_loss.append(epoch_train_loss)
-        epoch_vl_loss.append(epoch_val_loss)
-        epoch_tr_acc.append(epoch_train_acc)
-        epoch_vl_acc.append(epoch_val_acc)
-        print(f'Epoch {epoch + 1}')
-        print(f'train_loss : {epoch_train_loss} val_loss : {epoch_val_loss}')
-        print(f'train_accuracy : {epoch_train_acc} val_accuracy : {epoch_val_acc}')
-
-    # Test Set:
-    test_losses = []
-    test_acc = []
-    model.eval()
-    for batch in test_loader:
-        outputs = model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device))
-        criterion = torch.nn.BCELoss()
-        loss = criterion(outputs.view(-1, OUTPUT_DIM), batch['labels'].type_as(outputs).view(-1, OUTPUT_DIM))
-        test_losses.append(loss.item())
-        # Update tracking variables
-        preds = outputs.detach().cpu().numpy()
-        new_preds = np.zeros(preds.shape)
-        for i in range(len(preds)):
-            new_preds[i][np.argmax(preds[i])] = 1
-        test_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                  y_pred=new_preds.astype(int))
-        test_acc.append(test_accuracy)
-    test_loss_av = np.mean(test_losses)
-    test_acc_av = np.mean(test_acc)
-    print(f'Test Accuracy: {test_acc_av} Test Loss: {test_loss_av}')
+# run training loop, save model
+Trainer(model_type=model_type)
 
 print('Done')
