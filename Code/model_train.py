@@ -13,6 +13,7 @@ from transformers import get_scheduler
 from sklearn.metrics import accuracy_score
 import numpy as np
 import gdown
+import matplotlib as plt
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -31,8 +32,9 @@ clip = 5
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model_type = 'MLP'
-#Says we want to save the best model during training loop
-SAVE_MODEL = True
+SAVE_MODEL = True #True to save the best model
+print_metrics = True #True to plot train and val loss/accuracy
+
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
 def TextCleaning(text):
     '''
@@ -120,7 +122,6 @@ def Trainer(model_type=model_type):
 
         # Store our loss and accuracy for plotting
 
-        valid_loss_min = np.Inf
         epoch_tr_loss, epoch_vl_loss = [], []
         epoch_tr_acc, epoch_vl_acc = [], []
         met_test_best = 0
@@ -156,20 +157,21 @@ def Trainer(model_type=model_type):
             model.eval()
             val_h = model.init_hidden(BATCH_SIZE)
             for batch in valid_loader:
-                inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch[
-                    'attention_mask'].to(device)
-                val_h = tuple([each.data for each in val_h])
-                output, val_h = model(inputs, val_h, attention_mask)
-                val_loss = criterion(output, labels.float())
-                val_losses.append(val_loss.item())
-                # Update tracking variables
-                preds = output.detach().cpu().numpy()
-                new_preds = np.zeros(preds.shape)
-                for i in range(len(preds)):
-                    new_preds[i][np.argmax(preds[i])] = 1
-                val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
-                                              y_pred=new_preds.astype(int))
-                val_acc.append(val_accuracy)
+                with torch.no_grad():
+                    inputs, labels, attention_mask = batch['input_ids'].to(device), batch['labels'].to(device), batch[
+                        'attention_mask'].to(device)
+                    val_h = tuple([each.data for each in val_h])
+                    output, val_h = model(inputs, val_h, attention_mask)
+                    val_loss = criterion(output, labels.float())
+                    val_losses.append(val_loss.item())
+                    # Update tracking variables
+                    preds = output.detach().cpu().numpy()
+                    new_preds = np.zeros(preds.shape)
+                    for i in range(len(preds)):
+                        new_preds[i][np.argmax(preds[i])] = 1
+                    val_accuracy = accuracy_score(y_true=batch['labels'].cpu().numpy().astype(int),
+                                                  y_pred=new_preds.astype(int))
+                    val_acc.append(val_accuracy)
 
             epoch_train_loss = np.mean(train_losses)
             epoch_val_loss = np.mean(val_losses)
@@ -193,17 +195,25 @@ def Trainer(model_type=model_type):
                 torch.save(model.state_dict(), "model_nn.pt")
                 print("The model has been saved!")
                 met_test_best = met_test
+        if print_metrics is True:
+            # Plots test vs train accuracy by epoch number
+            plt.plot(range(epoch + 1), epoch_tr_acc, label="Train")
+            plt.plot(range(epoch + 1), epoch_vl_acc, label="Val")
+            plt.legend()
+            plt.show()
+            plt.savefig('accuracy_fig.png', bbox_inches='tight')
+
+            # Clears plot so loss doesn't also show accuracy
+            plt.clf()
+
+            # Plots test vs train loss by epoch number
+            plt.plot(range(epoch + 1), epoch_tr_loss, label="Train")
+            plt.plot(range(epoch + 1), epoch_vl_loss, label="Val")
+            plt.legend()
+            plt.show()
+            plt.savefig('loss_fig.png', bbox_inches='tight')
 
     else:
-        model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
-        optimizer = AdamW(model.parameters(), lr=LR)
-
-        num_training_steps = N_EPOCHS * len(train_loader)
-        lr_scheduler = get_scheduler("linear", optimizer=optimizer,
-                                     num_warmup_steps=0, num_training_steps=num_training_steps)
-        print(num_training_steps)
-
-        model.to(device)
 
         # Store our loss and accuracy for plotting
         train_loss_set = []
@@ -211,6 +221,15 @@ def Trainer(model_type=model_type):
         epoch_tr_loss, epoch_vl_loss = [], []
         epoch_tr_acc, epoch_vl_acc = [], []
         met_test_best = 0
+
+        model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
+        optimizer = AdamW(model.parameters(), lr=LR)
+
+        num_training_steps = N_EPOCHS * len(train_loader)
+        lr_scheduler = get_scheduler("linear", optimizer=optimizer,
+                                     num_warmup_steps=0, num_training_steps=num_training_steps)
+
+        model.to(device)
 
         for epoch in range(N_EPOCHS):
             # Tracking variables
@@ -260,8 +279,6 @@ def Trainer(model_type=model_type):
 
             epoch_train_loss = np.mean(train_losses)
             epoch_val_loss = np.mean(val_losses)
-            # epoch_train_acc = train_acc / len(train_loader.dataset)
-            # epoch_val_acc = val_acc / len(valid_loader.dataset)
             epoch_train_acc = np.mean(train_acc)
             epoch_val_acc = np.mean(val_acc)
             epoch_tr_loss.append(epoch_train_loss)
@@ -280,6 +297,23 @@ def Trainer(model_type=model_type):
                 torch.save(model.state_dict(), "model_nn.pt")
                 print("The model has been saved!")
                 met_test_best = met_test
+        if print_metrics is True:
+            # Plots test vs train accuracy by epoch number
+            plt.plot(range(epoch + 1), epoch_tr_acc, label="Train")
+            plt.plot(range(epoch + 1), epoch_vl_acc, label="Val")
+            plt.legend()
+            plt.show()
+            plt.savefig('accuracy_fig.png', bbox_inches='tight')
+
+            # Clears plot so loss doesn't also show accuracy
+            plt.clf()
+
+            # Plots test vs train loss by epoch number
+            plt.plot(range(epoch + 1), epoch_tr_loss, label="Train")
+            plt.plot(range(epoch + 1), epoch_vl_loss, label="Val")
+            plt.legend()
+            plt.show()
+            plt.savefig('loss_fig.png', bbox_inches='tight')
 
 
 # %% -------------------------------------- Model Classes ------------------------------------------------------------------
@@ -344,10 +378,12 @@ class BERT_PLUS_MLP(nn.Module):
 # step 1: load data from .csv from google drive
 url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
 gdown.download(url, 'Tweets.csv', quiet=False)
-# PATH = os.getcwd()
+PATH = os.getcwd()
+DATA_PATH = PATH + os.path.sep + 'Data'
+
 # os.chdir(PATH + '/archive(4)/')
 #
-df = pd.read_csv('Tweets.csv')
+df = pd.read_csv(f'{DATA_PATH}/Tweets.csv')
 
 # get data with only text and labels
 df_copy = df.copy()
@@ -362,6 +398,10 @@ df_copy[input_col] = df_copy[input_col].apply(TextCleaning)
 # split data
 train, test = train_test_split(df_copy, train_size=0.8, random_state=SEED, stratify=df_copy['target'])
 train, val = train_test_split(train, train_size=0.8, random_state=SEED, stratify=train['target'])
+
+# save test data to use in test script
+os.chdir(DATA_PATH)
+test.to_csv("Tweets_test.csv")
 
 print(f'shape of train data is {train.shape}')
 print(f'shape of validation data is {val.shape}')
@@ -381,3 +421,5 @@ for param in bert.parameters():
 Trainer(model_type=model_type)
 
 print('Done')
+
+
