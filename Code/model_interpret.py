@@ -189,8 +189,8 @@ predicted_output = predict(input_ids, attention_mask)
 
 lig = LayerIntegratedGradients(predict, model.bert.embeddings)
 
-example, something = lig.attribute(inputs=(input_ids, attention_mask),
-                                  baselines=(baseline_ids, attention_baseline),
-                                   target = test_label,
+example, something = lig.attribute(inputs=input_ids),
+                                  baselines=baseline_ids,
+                                  additional_forward_args=attention_mask,
                                   return_convergence_delta=True)
 
