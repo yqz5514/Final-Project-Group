@@ -34,6 +34,7 @@ tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model_type = 'MLP'
 SAVE_MODEL = True #True to save the best model
 print_metrics = True #True to plot train and val loss/accuracy
+train_model = True #True to train model, false to export test data.
 
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
 def TextCleaning(text):
@@ -376,10 +377,12 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive
-url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
-gdown.download(url, 'Tweets.csv', quiet=False)
 PATH = os.getcwd()
 DATA_PATH = PATH + os.path.sep + 'Data'
+os.chdir(DATA_PATH)
+url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
+gdown.download(url, 'Tweets.csv', quiet=False)
+
 
 # os.chdir(PATH + '/archive(4)/')
 #
@@ -418,7 +421,8 @@ for param in bert.parameters():
     param.requires_grad = False
 
 # run training loop, save model
-Trainer(model_type=model_type)
+if train_model is True:
+    Trainer(model_type=model_type)
 
 print('Done')
 
