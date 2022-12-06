@@ -109,38 +109,10 @@ def predict(inputs, attention_mask=None):
         new_preds[i][torch.argmax(preds[i])] = 1
     return output
 
-# def squad_pos_forward_func(inputs, token_type_ids=None, position_ids=None, attention_mask=None, position=0):
-#     pred = predict(inputs,
-#                    token_type_ids=token_type_ids,
-#                    position_ids=position_ids,
-#                    attention_mask=attention_mask)
-#     pred = pred[position]
-#     return pred.max(1).values
-
-
 def construct_input(text, cls_token_id, ref_token_id, sep_token_id):
     input_ids = tokenizer.encode(text, add_special_tokens=True)
     baseline_ids = [cls_token_id] + [ref_token_id] * (len(input_ids)-2) + [sep_token_id]
     return torch.tensor([input_ids], device=device), torch.tensor([baseline_ids], device=device)
-
-
-# def construct_input_ref_token_type_pair(input_ids, sep_ind=0):
-#     seq_len = input_ids.size(1)
-#     token_type_ids = torch.tensor([[0 if i <= sep_ind else 1 for i in range(seq_len)]], device=device)
-#     ref_token_type_ids = torch.zeros_like(token_type_ids, device=device)  # * -1
-#     return token_type_ids, ref_token_type_ids
-
-
-# def construct_input_ref_pos_id_pair(input_ids):
-#     seq_length = input_ids.size(1)
-#     position_ids = torch.arange(seq_length, dtype=torch.long, device=device)
-#     # we could potentially also use random permutation with `torch.randperm(seq_length, device=device)`
-#     ref_position_ids = torch.zeros(seq_length, dtype=torch.long, device=device)
-#
-#     position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
-#     ref_position_ids = ref_position_ids.unsqueeze(0).expand_as(input_ids)
-#     return position_ids, ref_position_ids
-
 
 def construct_attention_mask(input_ids):
     mask = torch.ones_like(input_ids)
@@ -151,15 +123,50 @@ def construct_whole_bert_embeddings(input_ids):
     input_embeddings = model.bert.embeddings(input_ids)
     return input_embeddings
 
-# %% -------------------------------------- Main: Lime  ------------------------------------------------------------------
+def summarize_attributions(attributions):
+    attributions = attributions.sum(dim=-1).squeeze(0)
+    attributions = attributions / torch.norm(attributions)
+    return attributions
 
+def summarize_attributions(attributions):
+    attributions = attributions.sum(dim=-1).squeeze(0)
+    attributions = attributions / torch.norm(attributions)
+    return attributions
 
+def TextInterpreter(ex):
+    input_ids, baseline_ids = construct_input(ex[0], cls_token_id=cls_token_id, ref_token_id=ref_token_id, sep_token_id=sep_token_id)
+    attention_mask, attention_baseline = construct_attention_mask(input_ids)
 
+    indices = input_ids[0].detach().tolist()
+    all_tokens = tokenizer.convert_ids_to_tokens(indices)
 
-from lime.lime_text import LimeTextExplainer
+    predicted_output = predict(input_ids, attention_mask)
+    preds = predicted_output[0]
+    new_preds = torch.zeros(preds.shape)
+    for i in range(len(preds)):
+        new_preds[torch.argmax(preds)] = 1
 
-explainer = LimeTextExplainer(class_names=['neutral', 'positive', 'negative'])
+    lig = LayerIntegratedGradients(predict, model.bert.embeddings)
 
+    attributions_lig, delta = lig.attribute(inputs=input_ids,
+                                       baselines=baseline_ids,
+                                       target=2,
+                                       additional_forward_args=attention_mask,
+                                       return_convergence_delta=True)
+
+    attributions_sum = summarize_attributions(attributions_lig)
+
+    summary_vis = viz.VisualizationDataRecord(
+                            attributions_sum,
+                            torch.max(preds),
+                            new_preds.detach().cpu().numpy(),
+                            new_preds.detach().cpu().numpy(),
+                            str(ex[1]),
+                            attributions_sum.sum(),
+                            all_tokens,
+                            delta)
+    vis_data_records.append(summary_vis)
+    return
 
 # %% -------------------------------------- Main: Captum  ------------------------------------------------------------------
 # load model
@@ -182,61 +189,24 @@ cls_token_id = tokenizer.cls_token_id # A token used for prepending to the conca
 # load data
 df = pd.read_csv(f'{DATA_PATH}/Tweets_test.csv')
 
-test_text, test_label = df.iloc[0]['text'], df.iloc[0]['target']
+# create examples, do basic preprocessing on labels
+vis_data_records = []
+examples = []
+n=10
+for i in range(n):
+    text, label = df.iloc[i]['text'], df.iloc[i]['target']
+    remove = ['[', ']', ',', ' ']
+    label = [float(i) for i in label if i not in remove]
+    examples.append([text, label])
 
-remove = ['[', ']', ',', ' ']
-test_label = [float(i) for i in test_label if i not in remove]
-target = [test_label]
 
+TextInterpreter(examples[0])
+TextInterpreter(examples[1])
+TextInterpreter(examples[2])
+TextInterpreter(examples[3])
+TextInterpreter(examples[4])
+TextInterpreter(examples[5])
 
-input_ids, baseline_ids = construct_input(test_text, cls_token_id=cls_token_id, ref_token_id=ref_token_id, sep_token_id=sep_token_id)
-attention_mask, attention_baseline = construct_attention_mask(input_ids)
-
-indices = input_ids[0].detach().tolist()
-all_tokens = tokenizer.convert_ids_to_tokens(indices)
-
-predicted_output = predict(input_ids, attention_mask)
-preds = predicted_output[0]
-new_preds = torch.zeros(preds.shape)
-for i in range(len(preds)):
-    new_preds[torch.argmax(preds[i])] = 1
-
-lig = LayerIntegratedGradients(predict, model.bert.embeddings)
-
-attributions_lig, delta= lig.attribute(inputs=input_ids,
-                                   baselines=baseline_ids,
-                                   target=2,
-                                   additional_forward_args=attention_mask,
-                                   return_convergence_delta=True)
-
-def summarize_attributions(attributions):
-    attributions = attributions.sum(dim=-1).squeeze(0)
-    attributions = attributions / torch.norm(attributions)
-    return attributions
-
-attributions_sum = summarize_attributions(attributions_lig)
-# storing couple samples in an array for visualization purposes
-# summary_vis = viz.VisualizationDataRecord(
-#                         attributions_sum,
-#                         torch.max(torch.softmax(predicted_output[0], dim=0)),
-#                         torch.argmax(predicted_output),
-#                         torch.argmax(predicted_output),
-#                         str(test_label),
-#                         attributions_sum.sum(),
-#                         all_tokens,
-#                         delta)
-
-summary_vis = viz.VisualizationDataRecord(
-                        attributions_sum,
-                        torch.max(preds),
-                        new_preds,
-                        new_preds,
-                        str(test_label),
-                        attributions_sum.sum(),
-                        all_tokens,
-                        delta)
-
-visual = viz.visualize_text([summary_vis])
+visual = viz.visualize_text(vis_data_records)
 with open("data.html", "w") as file:
     file.write(visual.data)
-
