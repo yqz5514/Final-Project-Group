@@ -3,3 +3,5 @@ Code/archive(4)/database.sqlite
 Code/archive(4)/.database.sqlite.icloud
 *.iml
 *.xml
+Data/data.html
+Data/model_nn.pt

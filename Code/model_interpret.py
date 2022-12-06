@@ -151,7 +151,17 @@ def construct_whole_bert_embeddings(input_ids):
     input_embeddings = model.bert.embeddings(input_ids)
     return input_embeddings
 
-# %% -------------------------------------- Main ------------------------------------------------------------------
+# %% -------------------------------------- Main: Lime  ------------------------------------------------------------------
+
+
+
+
+from lime.lime_text import LimeTextExplainer
+
+explainer = LimeTextExplainer(class_names=['neutral', 'positive', 'negative'])
+
+
+# %% -------------------------------------- Main: Captum  ------------------------------------------------------------------
 # load model
 PATH = '/home/ubuntu/Final-Project-Group'
 MODEL_PATH = PATH + os.path.sep + 'Data'
@@ -176,7 +186,7 @@ test_text, test_label = df.iloc[0]['text'], df.iloc[0]['target']
 
 remove = ['[', ']', ',', ' ']
 test_label = [float(i) for i in test_label if i not in remove]
-
+target = [test_label]
 
 
 input_ids, baseline_ids = construct_input(test_text, cls_token_id=cls_token_id, ref_token_id=ref_token_id, sep_token_id=sep_token_id)
@@ -186,11 +196,47 @@ indices = input_ids[0].detach().tolist()
 all_tokens = tokenizer.convert_ids_to_tokens(indices)
 
 predicted_output = predict(input_ids, attention_mask)
+preds = predicted_output[0]
+new_preds = torch.zeros(preds.shape)
+for i in range(len(preds)):
+    new_preds[torch.argmax(preds[i])] = 1
 
 lig = LayerIntegratedGradients(predict, model.bert.embeddings)
 
-example, something = lig.attribute(inputs=input_ids,
+attributions_lig, delta= lig.attribute(inputs=input_ids,
                                    baselines=baseline_ids,
+                                   target=2,
                                    additional_forward_args=attention_mask,
                                    return_convergence_delta=True)
+
+def summarize_attributions(attributions):
+    attributions = attributions.sum(dim=-1).squeeze(0)
+    attributions = attributions / torch.norm(attributions)
+    return attributions
+
+attributions_sum = summarize_attributions(attributions_lig)
+# storing couple samples in an array for visualization purposes
+# summary_vis = viz.VisualizationDataRecord(
+#                         attributions_sum,
+#                         torch.max(torch.softmax(predicted_output[0], dim=0)),
+#                         torch.argmax(predicted_output),
+#                         torch.argmax(predicted_output),
+#                         str(test_label),
+#                         attributions_sum.sum(),
+#                         all_tokens,
+#                         delta)
+
+summary_vis = viz.VisualizationDataRecord(
+                        attributions_sum,
+                        torch.max(preds),
+                        new_preds,
+                        new_preds,
+                        str(test_label),
+                        attributions_sum.sum(),
+                        all_tokens,
+                        delta)
+
+visual = viz.visualize_text([summary_vis])
+with open("data.html", "w") as file:
+    file.write(visual.data)
 
