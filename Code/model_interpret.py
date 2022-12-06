@@ -199,7 +199,6 @@ for i in range(n):
     label = [float(i) for i in label if i not in remove]
     examples.append([text, label])
 
-
 TextInterpreter(examples[0])
 TextInterpreter(examples[1])
 TextInterpreter(examples[2])
