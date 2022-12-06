@@ -6,12 +6,10 @@ import torch.nn as nn
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoModel
-from transformers import AdamW
-from transformers import get_scheduler
 from sklearn.metrics import accuracy_score
 import numpy as np
 import gdown
-import matplotlib as plt
+
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -22,8 +20,6 @@ OUTPUT_DIM = 3
 BATCH_SIZE = 64
 #MAX_VOCAB_SIZE = 25_000
 MAX_LEN = 300
-N_EPOCHS = 5
-LR = 0.001
 no_layers = 3
 hidden_dim = 256
 clip = 5
@@ -267,13 +263,6 @@ df = pd.read_csv(f'{DATA_PATH}/Tweets_test.csv')
 
 # get data with only text and labels
 test = df.copy()
-input_col = 'text'
-label_col = 'airline_sentiment'
-test = test[[input_col, label_col]]
-test = getLabel(test, label_col, input_col)
-
-# clean X data
-test[input_col] = test[input_col].apply(TextCleaning)
 print(f'shape of test data is {test.shape}')
 
 test_loader = create_data_loader(test, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)

@@ -375,14 +375,14 @@ class BERT_PLUS_MLP(nn.Module):
         return x
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
-# step 1: load data from .csv from google drive
+# step 1: load data from .csv from google drive. NOTE: need to fix, doesn't work downloaded from google.
 url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
-gdown.download(url, 'Tweets.csv', quiet=False)
-PATH = os.getcwd()
+PATH = '/home/ubuntu/Final-Project-Group' #NOTE: need to change to arg parse
 DATA_PATH = PATH + os.path.sep + 'Data'
+os.chdir(DATA_PATH)
+# gdown.download(url, 'Tweets.csv', quiet=False)
 
-# os.chdir(PATH + '/archive(4)/')
-#
+
 df = pd.read_csv(f'{DATA_PATH}/Tweets.csv')
 
 # get data with only text and labels
@@ -409,7 +409,6 @@ print(f'shape of test data is {test.shape}')
 
 train_loader = create_data_loader(train, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
 valid_loader = create_data_loader(val, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
-test_loader = create_data_loader(test, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
 
 # %% -------------------------------------- Model ------------------------------------------------------------------
 bert = AutoModel.from_pretrained(checkpoint)
