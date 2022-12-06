@@ -70,6 +70,14 @@ class BERT_PLUS_MLP(nn.Module):
         x = self.fc2(x)
         x = self.softmax(x)
         return x
+
+# %% -------------------------------------- Global Vars ------------------------------------------------------------------
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# replace <PATH-TO-SAVED-MODEL> with the real path of the saved model
+model_type = 'MLP'
+checkpoint = "bert-base-uncased"
+model_type = 'MLP'
+
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
 def DefineModel(model_type=model_type):
     OUTPUT_DIM = 3
@@ -93,75 +101,62 @@ def DefineModel(model_type=model_type):
 
     return model
 
-def predict(inputs, token_type_ids=None, position_ids=None, attention_mask=None):
-    output = model(inputs, token_type_ids=token_type_ids,
-                 position_ids=position_ids, attention_mask=attention_mask, )
-    return output.start_logits, output.end_logits
+def predict(inputs, attention_mask=None):
+    output = model(input_ids=inputs, attention_mask=attention_mask)
+    preds = output
+    new_preds = torch.zeros(preds.shape)
+    for i in range(len(preds)):
+        new_preds[i][torch.argmax(preds[i])] = 1
+    return output
 
-def squad_pos_forward_func(inputs, token_type_ids=None, position_ids=None, attention_mask=None, position=0):
-    pred = predict(inputs,
-                   token_type_ids=token_type_ids,
-                   position_ids=position_ids,
-                   attention_mask=attention_mask)
-    pred = pred[position]
-    return pred.max(1).values
-
-
-def construct_input_ref_pair(question, text, ref_token_id, sep_token_id, cls_token_id):
-    question_ids = tokenizer.encode(question, add_special_tokens=False)
-    text_ids = tokenizer.encode(text, add_special_tokens=False)
-
-    # construct input token ids
-    input_ids = [cls_token_id] + question_ids + [sep_token_id] + text_ids + [sep_token_id]
-
-    # construct reference token ids
-    ref_input_ids = [cls_token_id] + [ref_token_id] * len(question_ids) + [sep_token_id] + \
-                    [ref_token_id] * len(text_ids) + [sep_token_id]
-
-    return torch.tensor([input_ids], device=device), torch.tensor([ref_input_ids], device=device), len(question_ids)
+# def squad_pos_forward_func(inputs, token_type_ids=None, position_ids=None, attention_mask=None, position=0):
+#     pred = predict(inputs,
+#                    token_type_ids=token_type_ids,
+#                    position_ids=position_ids,
+#                    attention_mask=attention_mask)
+#     pred = pred[position]
+#     return pred.max(1).values
 
 
-def construct_input_ref_token_type_pair(input_ids, sep_ind=0):
-    seq_len = input_ids.size(1)
-    token_type_ids = torch.tensor([[0 if i <= sep_ind else 1 for i in range(seq_len)]], device=device)
-    ref_token_type_ids = torch.zeros_like(token_type_ids, device=device)  # * -1
-    return token_type_ids, ref_token_type_ids
+def construct_input(text, cls_token_id, ref_token_id, sep_token_id):
+    input_ids = tokenizer.encode(text, add_special_tokens=True)
+    baseline_ids = [cls_token_id] + [ref_token_id] * (len(input_ids)-2) + [sep_token_id]
+    return torch.tensor(input_ids, device=device), torch.tensor(baseline_ids, device=device)
 
 
-def construct_input_ref_pos_id_pair(input_ids):
-    seq_length = input_ids.size(1)
-    position_ids = torch.arange(seq_length, dtype=torch.long, device=device)
-    # we could potentially also use random permutation with `torch.randperm(seq_length, device=device)`
-    ref_position_ids = torch.zeros(seq_length, dtype=torch.long, device=device)
+# def construct_input_ref_token_type_pair(input_ids, sep_ind=0):
+#     seq_len = input_ids.size(1)
+#     token_type_ids = torch.tensor([[0 if i <= sep_ind else 1 for i in range(seq_len)]], device=device)
+#     ref_token_type_ids = torch.zeros_like(token_type_ids, device=device)  # * -1
+#     return token_type_ids, ref_token_type_ids
 
-    position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
-    ref_position_ids = ref_position_ids.unsqueeze(0).expand_as(input_ids)
-    return position_ids, ref_position_ids
+
+# def construct_input_ref_pos_id_pair(input_ids):
+#     seq_length = input_ids.size(1)
+#     position_ids = torch.arange(seq_length, dtype=torch.long, device=device)
+#     # we could potentially also use random permutation with `torch.randperm(seq_length, device=device)`
+#     ref_position_ids = torch.zeros(seq_length, dtype=torch.long, device=device)
+#
+#     position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
+#     ref_position_ids = ref_position_ids.unsqueeze(0).expand_as(input_ids)
+#     return position_ids, ref_position_ids
 
 
 def construct_attention_mask(input_ids):
-    return torch.ones_like(input_ids)
+    mask = torch.ones_like(input_ids)
+    baseline = torch.zeros_like(input_ids)
+    return mask, baseline
 
-def construct_whole_bert_embeddings(input_ids, ref_input_ids,
-                                    token_type_ids=None, ref_token_type_ids=None,
-                                    position_ids=None, ref_position_ids=None):
-    input_embeddings = model.bert.embeddings(input_ids, token_type_ids=token_type_ids, position_ids=position_ids)
-    ref_input_embeddings = model.bert.embeddings(ref_input_ids, token_type_ids=ref_token_type_ids,
-                                                 position_ids=ref_position_ids)
-
-    return input_embeddings, ref_input_embeddings
-# %% -------------------------------------- Global Vars ------------------------------------------------------------------
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# replace <PATH-TO-SAVED-MODEL> with the real path of the saved model
-model_type = 'MLP'
-checkpoint = "bert-base-uncased"
-model_type = 'MLP'
+def construct_whole_bert_embeddings(input_ids):
+    input_embeddings = model.bert.embeddings(input_ids)
+    return input_embeddings
 
 # %% -------------------------------------- Main ------------------------------------------------------------------
 # load model
 PATH = '/home/ubuntu/Final-Project-Group'
 MODEL_PATH = PATH + os.path.sep + 'Data'
 DATA_PATH = PATH + os.path.sep + 'Data'
+os.chdir(MODEL_PATH)
 model = DefineModel(model_type=model_type)
 model.eval()
 model.zero_grad()
@@ -176,4 +171,26 @@ cls_token_id = tokenizer.cls_token_id # A token used for prepending to the conca
 
 # load data
 df = pd.read_csv(f'{DATA_PATH}/Tweets_test.csv')
+
+test_text, test_label = df.iloc[0]['text'], df.iloc[0]['target']
+
+remove = ['[', ']', ',', ' ']
+test_label = [float(i) for i in test_label if i not in remove]
+
+
+
+input_ids, baseline_ids = construct_input(test_text, cls_token_id=cls_token_id, ref_token_id=ref_token_id, sep_token_id=sep_token_id)
+attention_mask, attention_baseline = construct_attention_mask(input_ids)
+
+indices = input_ids[0].detach().tolist()
+all_tokens = tokenizer.convert_ids_to_tokens(indices)
+
+predicted_output = predict(input_ids, attention_mask)
+
+lig = LayerIntegratedGradients(predict, model.bert.embeddings)
+
+example, something = lig.attribute(inputs=(input_ids, attention_mask),
+                                  baselines=(baseline_ids, attention_baseline),
+                                   target = test_label,
+                                  return_convergence_delta=True)
 
