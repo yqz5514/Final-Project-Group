@@ -310,7 +310,7 @@ def predict_probab(STR):
     #                           return_token_type_ids=True, return_attention_mask=True, return_tensors='np')
     #inputs = [z['input_ids'], z['attention_mask']]
     inputs, attention_mask = z['input_ids'].to(device),z['attention_mask'].to(device)
-    h = model.init_hidden(BATCH_SIZE)
+    h = model.init_hidden(1)
     h = tuple([each.data for each in h])
     output, h = model(inputs, h, attention_mask)
     preds = output.detach().cpu().numpy()
