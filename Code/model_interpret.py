@@ -121,7 +121,7 @@ def predict(inputs, attention_mask=None):
 def construct_input(text, cls_token_id, ref_token_id, sep_token_id):
     input_ids = tokenizer.encode(text, add_special_tokens=True)
     baseline_ids = [cls_token_id] + [ref_token_id] * (len(input_ids)-2) + [sep_token_id]
-    return torch.tensor(input_ids, device=device), torch.tensor(baseline_ids, device=device)
+    return torch.tensor([input_ids], device=device), torch.tensor([baseline_ids], device=device)
 
 
 # def construct_input_ref_token_type_pair(input_ids, sep_ind=0):
@@ -189,8 +189,8 @@ predicted_output = predict(input_ids, attention_mask)
 
 lig = LayerIntegratedGradients(predict, model.bert.embeddings)
 
-example, something = lig.attribute(inputs=input_ids),
-                                  baselines=baseline_ids,
-                                  additional_forward_args=attention_mask,
-                                  return_convergence_delta=True)
+example, something = lig.attribute(inputs=input_ids,
+                                   baselines=baseline_ids,
+                                   additional_forward_args=attention_mask,
+                                   return_convergence_delta=True)
 
