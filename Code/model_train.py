@@ -376,7 +376,7 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive. NOTE: need to fix, doesn't work downloaded from google.
-url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
+url = 'https://drive.google.com/uc?id=1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg&export=download'
 PATH = '/home/ubuntu/Final-Project-Group' #NOTE: need to change to arg parse
 DATA_PATH = PATH + os.path.sep + 'Data'
 os.chdir(DATA_PATH)
