@@ -76,7 +76,7 @@ class nlpDataset(Dataset):
 def Tester(model_type=model_type):
     if model_type == 'RNN':
         model = BERT_PLUS_RNN(bert, no_layers, hidden_dim, OUTPUT_DIM, BATCH_SIZE)
-        model.load_state_dict(torch.load('model_nn.pt', map_location=device))
+        model.load_state_dict(torch.load('model_onehot.pt', map_location=device))
         model.to(device)
 
         criterion = torch.nn.BCELoss()
@@ -121,7 +121,7 @@ def Tester(model_type=model_type):
     else:
 
         model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
-        model.load_state_dict(torch.load('model_nn.pt', map_location=device))
+        model.load_state_dict(torch.load('model_onehot.pt', map_location=device))
         model.to(device)
 
         test_losses = []
@@ -223,21 +223,23 @@ class BERT_PLUS_MLP(nn.Module):
         return x
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
-# step 1: load data from .csv from google drive
+# step 1: load data from .csv 
 parser = argparse.ArgumentParser()
 parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
 args = parser.parse_args()
 PATH = args.path
 DATA_PATH = PATH + os.path.sep + 'Data'
-
-# os.chdir(PATH + '/archive(4)/')
+MODEL_PATH = PATH + os.path.sep + 'Data'
 #
 df = pd.read_csv(f'{DATA_PATH}/Tweets_test.csv')
+
+os.chdir(DATA_PATH)
 
 # get data with only text and labels
 test = df.copy()
 print(f'shape of test data is {test.shape}')
-
+input_col = 'text'
+label_col = 'airline_sentiment'
 test_loader = create_data_loader(test, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
 
 # %% -------------------------------------- Model ------------------------------------------------------------------

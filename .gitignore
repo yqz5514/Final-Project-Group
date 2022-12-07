@@ -6,3 +6,4 @@ Code/archive(4)/.database.sqlite.icloud
 Data/data.html
 Data/model_nn.pt
 *.icloud
+*.pt
