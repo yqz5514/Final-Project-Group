@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoModel
 from sklearn.metrics import accuracy_score
 import numpy as np
-import gdown
+import argparse
 
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
@@ -256,7 +256,10 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive
-PATH = os.getcwd()
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+args = parser.parse_args()
+PATH = args.path
 DATA_PATH = PATH + os.path.sep + 'Data'
 
 # os.chdir(PATH + '/archive(4)/')
