@@ -37,7 +37,7 @@ def create_data_loader(df, tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE):
         tokenizer = tokenizer,
         max_len = max_len,
         input_col = input_col)
-    return DataLoader(ds, batch_size=BATCH_SIZE, collate_fn=data_collator, drop_last=True)
+    return DataLoader(ds, batch_size=BATCH_SIZE, collate_fn=data_collator, drop_last=False)
 
 
 # %% -------------------------------------- Dataset Class ------------------------------------------------------------------
@@ -160,8 +160,7 @@ def Tester(model_type=model_type):
         test['real_labels'] = final_real_labels
 
         if export_data is True:
-            test_df.to_csv('test_predictions.csv')
-
+            test.to_csv('test_predictions.csv')
 
 
 # %% -------------------------------------- Model Classes ------------------------------------------------------------------
@@ -224,11 +223,11 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv 
-# parser = argparse.ArgumentParser()
-# parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
-# args = parser.parse_args()
-# PATH = args.path
-PATH = '~/Final-Project-Group'
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+args = parser.parse_args()
+PATH = args.path
+#PATH = 'home/ubuntu/Final-Project-Group'
 DATA_PATH = PATH + os.path.sep + 'Data'
 MODEL_PATH = PATH + os.path.sep + 'Data'
 #
@@ -240,7 +239,19 @@ os.chdir(DATA_PATH)
 test = df.copy()
 print(f'shape of test data is {test.shape}')
 input_col = 'text'
-label_col = 'airline_sentiment'
+label_col = 'target'
+def cleanLabel(row):
+    '''
+    cleans function after loading from csv file
+    :param row:
+    :return:
+    '''
+    remove = ['[', ']', ',', ' ']
+    label = [float(i) for i in row if i not in remove]
+    return label
+
+test[label_col] = test[label_col].apply(cleanLabel)
+
 test_loader = create_data_loader(test, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
 
 # %% -------------------------------------- Model ------------------------------------------------------------------
