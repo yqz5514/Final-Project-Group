@@ -26,6 +26,7 @@ clip = 5
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model_type = 'MLP'
+export_data = True
 
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
 def TextCleaning(text):
@@ -189,6 +190,9 @@ def Tester(model_type=model_type):
         print(f'Test Accuracy: {test_acc_av} Test Loss: {test_loss_av}')
         test['pred_labels'] = final_pred_labels
         test['real_labels'] = final_real_labels
+
+        if export_data is True:
+            test_df.to_csv('test_predictions.csv')
 
 
 
