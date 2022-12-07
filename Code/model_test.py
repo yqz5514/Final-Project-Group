@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoModel
 from sklearn.metrics import accuracy_score
 import numpy as np
-import gdown
+import argparse
 
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
@@ -26,40 +26,9 @@ clip = 5
 checkpoint = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model_type = 'MLP'
+export_data = True
 
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
-def TextCleaning(text):
-    '''
-    Takes a string of text and performs some basic cleaning.
-    1. removes tabs
-    2. removes newlines
-    3. removes special chars
-    4. creates the word "not" from words ending in n't
-    '''
-    # Step 1
-    pattern1 = re.compile(r'\<.*?\>')
-    s = re.sub(pattern1, '', text)
-
-    # Step 2
-    pattern2 = re.compile(r'\n')
-    s = re.sub(pattern2, ' ', s)
-
-    # Step 3
-    pattern3 = re.compile(r'[^0-9a-zA-Z!/?]+')
-    s = re.sub(pattern3, ' ', s)
-
-    # Step 4
-    pattern4 = re.compile(r"n't")
-    s = re.sub(pattern4, " not", s)
-
-    return s
-
-def getLabel(df, label_col, input_col):
-    encoded = pd.get_dummies(df, columns=[label_col])
-    encoded_val = encoded.iloc[:, 1:].apply(list, axis=1)
-    encoded['target'] = encoded_val
-    return_df = encoded[[input_col, 'target']]
-    return return_df
 
 def create_data_loader(df, tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE):
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
@@ -68,7 +37,7 @@ def create_data_loader(df, tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE):
         tokenizer = tokenizer,
         max_len = max_len,
         input_col = input_col)
-    return DataLoader(ds, batch_size=BATCH_SIZE, collate_fn=data_collator, drop_last=True)
+    return DataLoader(ds, batch_size=BATCH_SIZE, collate_fn=data_collator, drop_last=False)
 
 
 # %% -------------------------------------- Dataset Class ------------------------------------------------------------------
@@ -107,7 +76,7 @@ class nlpDataset(Dataset):
 def Tester(model_type=model_type):
     if model_type == 'RNN':
         model = BERT_PLUS_RNN(bert, no_layers, hidden_dim, OUTPUT_DIM, BATCH_SIZE)
-        model.load_state_dict(torch.load('model_nn.pt', map_location=device))
+        model.load_state_dict(torch.load('model_onehot.pt', map_location=device))
         model.to(device)
 
         criterion = torch.nn.BCELoss()
@@ -152,7 +121,7 @@ def Tester(model_type=model_type):
     else:
 
         model = BERT_PLUS_MLP(bert, OUTPUT_DIM, 500)
-        model.load_state_dict(torch.load('model_nn.pt', map_location=device))
+        model.load_state_dict(torch.load('model_onehot.pt', map_location=device))
         model.to(device)
 
         test_losses = []
@@ -190,6 +159,8 @@ def Tester(model_type=model_type):
         test['pred_labels'] = final_pred_labels
         test['real_labels'] = final_real_labels
 
+        if export_data is True:
+            test.to_csv('test_predictions.csv')
 
 
 # %% -------------------------------------- Model Classes ------------------------------------------------------------------
@@ -251,19 +222,35 @@ class BERT_PLUS_MLP(nn.Module):
         return x
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
-# step 1: load data from .csv from google drive
-url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
-gdown.download(url, 'Tweets.csv', quiet=False)
-PATH = os.getcwd()
+# step 1: load data from .csv 
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+args = parser.parse_args()
+PATH = args.path
+#PATH = 'home/ubuntu/Final-Project-Group'
 DATA_PATH = PATH + os.path.sep + 'Data'
-
-# os.chdir(PATH + '/archive(4)/')
+MODEL_PATH = PATH + os.path.sep + 'Data'
 #
 df = pd.read_csv(f'{DATA_PATH}/Tweets_test.csv')
+
+os.chdir(DATA_PATH)
 
 # get data with only text and labels
 test = df.copy()
 print(f'shape of test data is {test.shape}')
+input_col = 'text'
+label_col = 'target'
+def cleanLabel(row):
+    '''
+    cleans function after loading from csv file
+    :param row:
+    :return:
+    '''
+    remove = ['[', ']', ',', ' ']
+    label = [float(i) for i in row if i not in remove]
+    return label
+
+test[label_col] = test[label_col].apply(cleanLabel)
 
 test_loader = create_data_loader(test, tokenizer=tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE)
 
