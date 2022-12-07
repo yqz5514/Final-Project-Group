@@ -330,3 +330,72 @@ def predict_probab(STR):
 #input_ids = '13789'
 STR = str(test.text[13789])
 exp = explainer.explain_instance(STR, predict_probab, num_features=10, num_samples=1)
+
+#%%----------------------------------------------LIME2----------------------------------------------
+# used on dateset
+
+# df2 = df[['text','airline_sentiment']]
+
+# df2['text'] = df2['text'].apply(text_process)
+
+class_names = ['positive','negative', 'neutral']
+
+results = []
+def predictor(STR):
+    z = tokenizer.encode_plus(
+            STR,
+            add_special_tokens=True,
+            max_length=300,
+            return_attention_mask=True,
+            is_split_into_words=True,
+            truncation=True,
+            padding=True,
+            return_tensors='pt',
+            )
+        #output = model(**tokenizer(STR, return_tensors="pt", padding=True))
+
+    inputs, attention_mask = z['input_ids'].to(device), z['attention_mask'].to(device)
+    # for batch in test_loader:
+    #     output = model(input_ids=batch['input_ids'].to(device), attention_mask=batch['attention_mask'].to(device))
+
+    h = model.init_hidden(1)
+    h = tuple([each.data for each in h])
+    output,h = model(inputs, h, attention_mask)
+    #probas = F.softmax(model(inputs, h, attention_mask).logits).detach().numpy()
+    with torch.no_grad():
+        #output = model(inputs, h, attention_mask)
+           logits = output[0]
+
+           logits = F.softmax(logits,dim=0)
+           results.append(logits.cpu().detach().numpy()[0])
+           results_array = np.array(results)
+
+    return results_array
+
+    #probas = F.softmax(h, dim = 1).cpu().detach().numpy()
+
+    # results.append(h.detach()[0])
+    #
+    # ress = [res for res in results]
+    # results_array = np.array(ress)
+    # return results_array
+
+
+
+# results.append(raw_outputs[0])
+#
+# ress = [res for res in results]
+# results_array = np.array(ress)
+# return results_array
+#
+# outputs = model(**tokenizer(texts, return_tensors="pt", padding=True))
+# probas = F.softmax(outputs.logits).detach().numpy()
+        #return probas
+#%%
+#predictor(str(test.text[13789]))
+#%%
+explainer = LimeTextExplainer(class_names=class_names)
+
+STR = str(test.text[2998])
+exp = explainer.explain_instance(STR, predictor, num_features=20, num_samples=2000)
+exp.show_in_notebook(text=STR)
