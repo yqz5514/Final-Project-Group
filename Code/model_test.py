@@ -252,8 +252,6 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive
-url = 'https://drive.google.com/file/d/1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg/view'
-gdown.download(url, 'Tweets.csv', quiet=False)
 PATH = os.getcwd()
 DATA_PATH = PATH + os.path.sep + 'Data'
 
