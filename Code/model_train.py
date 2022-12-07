@@ -14,6 +14,7 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 import gdown
 import matplotlib as plt
+import argparse
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -24,7 +25,7 @@ OUTPUT_DIM = 3
 BATCH_SIZE = 64
 #MAX_VOCAB_SIZE = 25_000
 MAX_LEN = 300
-N_EPOCHS = 5
+N_EPOCHS = 20
 LR = 0.001
 no_layers = 3
 hidden_dim = 256
@@ -36,32 +37,6 @@ SAVE_MODEL = True #True to save the best model
 print_metrics = True #True to plot train and val loss/accuracy
 
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
-def TextCleaning(text):
-    '''
-    Takes a string of text and performs some basic cleaning.
-    1. removes tabs
-    2. removes newlines
-    3. removes special chars
-    4. creates the word "not" from words ending in n't
-    '''
-    # Step 1
-    pattern1 = re.compile(r'\<.*?\>')
-    s = re.sub(pattern1, '', text)
-
-    # Step 2
-    pattern2 = re.compile(r'\n')
-    s = re.sub(pattern2, ' ', s)
-
-    # Step 3
-    pattern3 = re.compile(r'[^0-9a-zA-Z!/?]+')
-    s = re.sub(pattern3, ' ', s)
-
-    # Step 4
-    pattern4 = re.compile(r"n't")
-    s = re.sub(pattern4, " not", s)
-
-    return s
-
 # remove contradictions
 contraction_dict = {"ain't": "is not", "aren't": "are not", "can't": "cannot", "'cause": "because",
                     "could've": "could have", "couldn't": "could not", "didn't": "did not", "doesn't": "does not",
@@ -104,7 +79,6 @@ def _get_contractions(contraction_dict):
 
 contractions, contractions_re = _get_contractions(contraction_dict)
 
-
 def replace_contractions(text):
     def replace(match):
         return contractions[match.group(0)]
@@ -121,6 +95,33 @@ def replace_contractions(text):
    
 #     # Now remove any stopwords
 #     return ' '.join([word for word in text.split() if word.lower() not in STOPWORDS])
+
+def TextCleaning(text):
+    '''
+    Takes a string of text and performs some basic cleaning.
+    1. removes tabs
+    2. removes newlines
+    3. removes special chars
+    4. replaces contractions
+    '''
+    # Step 1
+    pattern1 = re.compile(r'\<.*?\>')
+    s = re.sub(pattern1, '', text)
+
+    # Step 2
+    pattern2 = re.compile(r'\n')
+    s = re.sub(pattern2, ' ', s)
+
+    # Step 3
+    pattern3 = re.compile(r'[^0-9a-zA-Z!/?]+')
+    s = re.sub(pattern3, ' ', s)
+
+    # Step 4: replace contractions 
+
+    # Step 4
+    s = replace_contractions(s)
+
+    return s
 
 def getLabel(df, label_col, input_col):
     encoded = pd.get_dummies(df, columns=[label_col])
@@ -252,7 +253,7 @@ def Trainer(model_type=model_type):
 
             # Saves the best model (assuming SAVE_MODEL=True at start): Code based on Exam 2 model saving code
             if met_test > met_test_best and SAVE_MODEL:
-                torch.save(model.state_dict(), "model_nn.pt")
+                torch.save(model.state_dict(), "model_onehot.pt")
                 print("The model has been saved!")
                 met_test_best = met_test
         if print_metrics is True:
@@ -354,7 +355,7 @@ def Trainer(model_type=model_type):
 
             # Saves the best model (assuming SAVE_MODEL=True at start): Code based on Exam 2 model saving code
             if met_test > met_test_best and SAVE_MODEL:
-                torch.save(model.state_dict(), "model_nn.pt")
+                torch.save(model.state_dict(), "model_onehot.pt")
                 print("The model has been saved!")
                 met_test_best = met_test
         if print_metrics is True:
@@ -369,8 +370,8 @@ def Trainer(model_type=model_type):
             plt.clf()
 
             # Plots test vs train loss by epoch number
-            plt.plot(range(epoch + 1), epoch_tr_loss, label="Train")
-            plt.plot(range(epoch + 1), epoch_vl_loss, label="Val")
+            plt.plt(range(epoch + 1), epoch_tr_loss, label="Train")
+            plt.plt(range(epoch + 1), epoch_vl_loss, label="Val")
             plt.legend()
             plt.show()
             plt.savefig('loss_fig.png', bbox_inches='tight')
@@ -436,11 +437,15 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive. NOTE: need to fix, doesn't work downloaded from google.
-url = 'https://drive.google.com/uc?id=1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg&export=download'
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+# args = parser.parse_args()
+# PATH = args.path
 PATH = '/home/ubuntu/Final-Project-Group' #NOTE: need to change to arg parse
+url = 'https://drive.google.com/uc?id=1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg&export=download'
 DATA_PATH = PATH + os.path.sep + 'Data'
 os.chdir(DATA_PATH)
-# gdown.download(url, 'Tweets.csv', quiet=False)
+gdown.download(url, 'Tweets.csv', quiet=False)
 
 
 df = pd.read_csv(f'{DATA_PATH}/Tweets.csv')

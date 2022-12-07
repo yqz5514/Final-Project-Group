@@ -143,28 +143,33 @@ def TextInterpreter(ex):
     predicted_output = predict(input_ids, attention_mask)
     preds = predicted_output[0]
     new_preds = torch.zeros(preds.shape)
-    for i in range(len(preds)):
-        new_preds[torch.argmax(preds)] = 1
-
+    new_preds[torch.argmax(preds)] = 1
+    prediction_score, pred_label_idx = torch.topk(preds, 1)
+    pred_label_idx.squeeze()
+    pred_label_int = pred_label_idx.squeeze().cpu().numpy().item()
+    real_label_int = np.argmax(ex[1]).item()
+    classes_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    pred_label_string = classes_dict[pred_label_int]
+    real_label_string = classes_dict[real_label_int]
     lig = LayerIntegratedGradients(predict, model.bert.embeddings)
 
     attributions_lig, delta = lig.attribute(inputs=input_ids,
                                        baselines=baseline_ids,
-                                       target=2,
+                                       target=pred_label_int,
                                        additional_forward_args=attention_mask,
                                        return_convergence_delta=True)
 
     attributions_sum = summarize_attributions(attributions_lig)
 
     summary_vis = viz.VisualizationDataRecord(
-                            attributions_sum,
-                            torch.max(preds),
-                            new_preds.detach().cpu().numpy(),
-                            new_preds.detach().cpu().numpy(),
-                            str(ex[1]),
-                            attributions_sum.sum(),
-                            all_tokens,
-                            delta)
+                            word_attributions=attributions_sum,
+                            pred_prob=torch.max(preds),
+                            pred_class=pred_label_string,
+                            true_class=real_label_string,
+                            attr_class=str(pred_label_int),
+                            attr_score=attributions_sum.sum(),
+                            raw_input_ids=all_tokens,
+                            convergence_score=delta)
     vis_data_records.append(summary_vis)
     return
 
@@ -199,12 +204,8 @@ for i in range(n):
     label = [float(i) for i in label if i not in remove]
     examples.append([text, label])
 
-TextInterpreter(examples[0])
-TextInterpreter(examples[1])
-TextInterpreter(examples[2])
-TextInterpreter(examples[3])
-TextInterpreter(examples[4])
-TextInterpreter(examples[5])
+for example in examples:
+    TextInterpreter(example)
 
 visual = viz.visualize_text(vis_data_records)
 with open("data.html", "w") as file:
