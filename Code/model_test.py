@@ -29,38 +29,6 @@ model_type = 'MLP'
 export_data = True
 
 # %% -------------------------------------- Helper Functions ------------------------------------------------------------------
-def TextCleaning(text):
-    '''
-    Takes a string of text and performs some basic cleaning.
-    1. removes tabs
-    2. removes newlines
-    3. removes special chars
-    4. creates the word "not" from words ending in n't
-    '''
-    # Step 1
-    pattern1 = re.compile(r'\<.*?\>')
-    s = re.sub(pattern1, '', text)
-
-    # Step 2
-    pattern2 = re.compile(r'\n')
-    s = re.sub(pattern2, ' ', s)
-
-    # Step 3
-    pattern3 = re.compile(r'[^0-9a-zA-Z!/?]+')
-    s = re.sub(pattern3, ' ', s)
-
-    # Step 4
-    pattern4 = re.compile(r"n't")
-    s = re.sub(pattern4, " not", s)
-
-    return s
-
-def getLabel(df, label_col, input_col):
-    encoded = pd.get_dummies(df, columns=[label_col])
-    encoded_val = encoded.iloc[:, 1:].apply(list, axis=1)
-    encoded['target'] = encoded_val
-    return_df = encoded[[input_col, 'target']]
-    return return_df
 
 def create_data_loader(df, tokenizer, max_len=MAX_LEN, batch_size=BATCH_SIZE):
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
