@@ -224,10 +224,11 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv 
-parser = argparse.ArgumentParser()
-parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
-args = parser.parse_args()
-PATH = args.path
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+# args = parser.parse_args()
+# PATH = args.path
+PATH = '~/Final-Project-Group'
 DATA_PATH = PATH + os.path.sep + 'Data'
 MODEL_PATH = PATH + os.path.sep + 'Data'
 #
