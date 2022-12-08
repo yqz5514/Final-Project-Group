@@ -11,7 +11,7 @@ from sklearn.metrics import classification_report, confusion_matrix
 # parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
 # args = parser.parse_args()
 # PATH = args.path
-PATH = '/Users/angelinaolson/Documents/Final-Project-Group-NLP/Data'
+PATH = '<INSERT PATH TO WHERE test_predictions.csv IS KEPT>' # Note: change to argsparse once done editing
 os.chdir(PATH)
 
 # Helper Functions:
