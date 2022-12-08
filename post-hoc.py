@@ -61,5 +61,5 @@ print(test_df['pred_string'].value_counts())
 report = classification_report(test_df['true_string'], test_df['pred_string'])
 print(report)
 
-matrix = confusion_matrix(test_df['true_string'], test_df['pred_string'])
+matrix = confusion_matrix(test_df['true_string'], test_df['pred_string'], labels = list(classes_dict.values()))
 print(matrix)
