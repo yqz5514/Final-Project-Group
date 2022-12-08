@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np 
 import argparse
 import os
-
+from sklearn.metrics import classification_report, confusion_matrix
 # set global vars
 # parser = argparse.ArgumentParser()
 # parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
@@ -44,5 +44,22 @@ def getRoundedPreds(row):
 
 test_df['rounded_preds'] = test_df['pred_labels'].apply(getRoundedPreds)
 
+# create string labels for test and predicted
+def getStringLabel(row):
+    idx = np.argmax(row)
+    label = classes_dict[idx]
+    return label 
 
+test_df['true_string'] = test_df['target'].apply(getStringLabel)
+test_df['pred_string'] = test_df['pred_labels'].apply(getStringLabel)
 
+# Basic: get count of real values and predicted values by class
+print(test_df['true_string'].value_counts())
+print(test_df['pred_string'].value_counts())
+
+# classification report
+report = classification_report(test_df['true_string'], test_df['pred_string'])
+print(report)
+
+matrix = confusion_matrix(test_df['true_string'], test_df['pred_string'])
+print(matrix)
