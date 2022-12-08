@@ -21,9 +21,10 @@ def cleanLabel(row):
     :param row:
     :return:
     '''
-    remove = ['[', ']', ',', ' ']
-    label = [float(i) for i in row if i not in remove]
-    return label
+    one = row.replace('[', '').replace(']', '')
+    two =  list(one.split(','))
+    three = [float(item) for item in two]
+    return three 
 
 # read in test predictions
 test_df = pd.read_csv('test_predictions.csv')
@@ -33,5 +34,15 @@ classes_dict = {0: 'negative', 1: 'neutral', 2: 'positive'}
 
 # clean labels
 test_df['target'] = test_df['target'].apply(cleanLabel)
-test_df['pred_label'] = test_df['pred_label'].apply(cleanLabel)
+test_df['pred_labels'] = test_df['pred_labels'].apply(cleanLabel)
+
+# create column of rounded predictions 
+def getRoundedPreds(row):
+    new_preds = np.zeros(3)
+    new_preds[np.argmax(row)] = 1
+    return list(new_preds) 
+
+test_df['rounded_preds'] = test_df['pred_labels'].apply(getRoundedPreds)
+
+
 
