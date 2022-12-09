@@ -8,3 +8,5 @@ Data/model_nn.pt
 *.icloud
 *.pt
 .idea/misc.xml
+*.xml
+*.xml
