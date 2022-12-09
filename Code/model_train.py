@@ -13,7 +13,7 @@ from transformers import get_scheduler
 from sklearn.metrics import accuracy_score
 import numpy as np
 import gdown
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import argparse
 
 # %% -------------------------------------- Global Vars ------------------------------------------------------------------
@@ -370,8 +370,8 @@ def Trainer(model_type=model_type):
             plt.clf()
 
             # Plots test vs train loss by epoch number
-            plt.plt(range(epoch + 1), epoch_tr_loss, label="Train")
-            plt.plt(range(epoch + 1), epoch_vl_loss, label="Val")
+            plt.plot(range(epoch + 1), epoch_tr_loss, label="Train")
+            plt.plot(range(epoch + 1), epoch_vl_loss, label="Val")
             plt.legend()
             plt.show()
             plt.savefig('loss_fig.png', bbox_inches='tight')
@@ -437,11 +437,11 @@ class BERT_PLUS_MLP(nn.Module):
 
 # %% -------------------------------------- Data Prep ------------------------------------------------------------------
 # step 1: load data from .csv from google drive. NOTE: need to fix, doesn't work downloaded from google.
-parser = argparse.ArgumentParser()
-parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
-args = parser.parse_args()
-PATH = args.path
-# PATH = '/home/ubuntu/Final-Project-Group' #NOTE: need to change to arg parse
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+# args = parser.parse_args()
+# PATH = args.path
+PATH = '/home/ubuntu/Final-Project-Group' #NOTE: need to change to arg parse
 url = 'https://drive.google.com/uc?id=1YXhGD6NJ7mzYG78U9OgKnCq9pjM_u9zg&export=download'
 DATA_PATH = PATH + os.path.sep + 'Data'
 os.chdir(DATA_PATH)
