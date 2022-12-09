@@ -7,11 +7,11 @@ import argparse
 import os
 from sklearn.metrics import classification_report, confusion_matrix
 # set global vars
-# parser = argparse.ArgumentParser()
-# parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
-# args = parser.parse_args()
-# PATH = args.path
-PATH = '<INSERT PATH TO WHERE test_predictions.csv IS KEPT>' # Note: change to argsparse once done editing
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+args = parser.parse_args()
+PATH = args.path
+# PATH = '<INSERT PATH TO WHERE test_predictions.csv IS KEPT>' Note: change to argsparse once done editing
 os.chdir(PATH)
 
 # Helper Functions:
