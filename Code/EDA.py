@@ -169,7 +169,7 @@ plt.title("Neutral Sentiments")
 # plt.show()
 plt.savefig("Neutral Sentiments",bbox_inches='tight')
 
-#neutral sentiments
+#negative sentiments
 plt.figure(6)
 df_neg = df[df['airline_sentiment']=='negative']
 neg_text = " ".join(str(i) for i in df_neg.text)
