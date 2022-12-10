@@ -182,7 +182,7 @@ plt.title("Negative Sentiments")
 # plt.show()
 plt.savefig("Negative Sentiments",bbox_inches='tight')
 
-
+#tweet length
 df["text Length"]= df["text"].str.len()
 
 def show_dist(df, col):
