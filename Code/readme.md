@@ -4,7 +4,7 @@ To create the original results of this paper with the model selected for interpr
 * model_interpret.py: this code interprets the model using the test data. The model and test data must be downloaded/created for this file to run.
 
 To avoid re-training the model, run the code as follows:
-* model_download.py: downlaods the model from Google Drive 
+* model_download.py: downloads the model from Google Drive 
 * model_train.py: toggle 'save_model' off; only output will be the split test data 
 * model_test.py: this code runs the model on the withheld test data 
 * model_interpret.py: this code interprets the model using the test data. The model and test data must be downloaded/created for this file to run.
