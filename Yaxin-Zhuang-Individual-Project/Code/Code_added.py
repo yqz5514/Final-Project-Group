@@ -57,3 +57,24 @@ df2['text'] = df2['text'].apply(text_process)
 #            'positive': 2,
 #             'negative': 3}
 # df2['airline_sentiment'] = df2['airline_sentiment'].map(s_mapping)
+#%%----------------------------confusionmatrics--------------------------------
+import numpy as np
+from pretty_confusion_matrix import pp_matrix_from_data
+#%%
+pp_matrix_from_data(test_df['true_string'], test_df['pred_string'], cmap='winter')
+
+#%%
+test_df['true_string']
+# %%
+import seaborn as sns
+import matplotlib.pyplot as plt     
+
+ax= plt.subplot()
+sns.heatmap(matrix, annot=True, fmt='g', ax=ax);  #annot=True to annotate cells, ftm='g' to disable scientific notation
+
+# labels, title and ticks
+ax.set_xlabel('True labels');
+ax.set_ylabel('Predicted label'); 
+ax.set_title('Confusion Matrix'); 
+ax.xaxis.set_ticklabels(['negative','neutral','positive']);
+ax.yaxis.set_ticklabels(['negative','neutral','positive']);
