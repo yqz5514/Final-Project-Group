@@ -10,4 +10,4 @@ To avoid re-training the model, run the code as follows:
 * model_interpret.py: this code interprets the model using the test data. The model and test data must be downloaded/created for this file to run.
 
 
-The EDA.py file may be run regardless of order. 
+The EDA.py file may be run regardless of order. Post-hoc.py should be run after generating test data predictions (running model_test.py). 
