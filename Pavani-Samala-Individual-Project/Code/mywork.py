@@ -196,6 +196,7 @@ def show_dist(df, col):
 
 show_dist(df,"text Length")
 
+#LIME
 # from lime.lime_text import LimeTextExplainer
 # #print(test)
 # test_doc = test['text'].tolist()
@@ -217,3 +218,24 @@ show_dist(df,"text Length")
 # print(c)
 # explainer = LimeTextExplainer(class_names=class_names)
 # exp = explainer.explain_instance(test_doc[0], predictor, num_samples=1, labels = (2,))
+
+# SHAP
+# from torch.utils.data import DataLoader
+# import transformers
+
+# import IPython
+# from IPython.core.display import HTML
+
+
+# tokenizer = transformers.AutoTokenizer.from_pretrained("nateraw/bert-base-uncased-emotion", use_fast=True)
+# model = transformers.AutoModelForSequenceClassification.from_pretrained("nateraw/bert-base-uncased-emotion").cuda()
+
+# pred = transformers.pipeline("text-classification", model=model, tokenizer=tokenizer, device=0, return_all_scores=True)
+# #
+# explainer = shap.Explainer(pred)
+# #
+# shap_values = explainer(train[input_col][:3])
+
+# shap.plots.text(shap_values[2])
+
+# IPython.core.display.HTML(data=shap.plots.text(shap_values))
