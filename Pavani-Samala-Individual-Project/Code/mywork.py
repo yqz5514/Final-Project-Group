@@ -196,7 +196,7 @@ def show_dist(df, col):
 
 show_dist(df,"text Length")
 
-#LIME
+# LIME
 # from lime.lime_text import LimeTextExplainer
 # #print(test)
 # test_doc = test['text'].tolist()
