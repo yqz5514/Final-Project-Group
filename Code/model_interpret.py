@@ -11,6 +11,7 @@ import os
 from transformers import AutoTokenizer, AutoModel
 from captum.attr import visualization as viz
 from captum.attr import LayerConductance, LayerIntegratedGradients
+import argparse
 
 
 # %% -------------------------------------- Model Classes ------------------------------------------------------------------
@@ -175,7 +176,10 @@ def TextInterpreter(ex):
 
 # %% -------------------------------------- Main: Captum  ------------------------------------------------------------------
 # load model
-PATH = '/home/ubuntu/Final-Project-Group'
+parser = argparse.ArgumentParser()
+parser.add_argument("--path", default=None, type=str, required=True)  # Path of file
+args = parser.parse_args()
+PATH = args.path
 MODEL_PATH = PATH + os.path.sep + 'Data'
 DATA_PATH = PATH + os.path.sep + 'Data'
 os.chdir(MODEL_PATH)
